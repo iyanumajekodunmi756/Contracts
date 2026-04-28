@@ -203,14 +203,29 @@ All values stored in `instance` storage.
 
 ```rust
 pub struct Vault {
-    pub owner: Address,          // Current beneficiary
-    pub total_amount: i128,      // Total tokens in this vault
-    pub released_amount: i128,   // Tokens already claimed or revoked
-    pub start_time: u64,         // Vesting start (unix timestamp)
-    pub end_time: u64,           // Vesting end (unix timestamp)
-    pub is_initialized: bool,    // Lazy init flag
+    // i128 (largest)
+    pub total_amount: i128, // = initial_deposit_shares
+    pub released_amount: i128,
+    pub keeper_fee: i128,
+    pub staked_amount: i128,
+
+    // 8-byte values
+    pub owner: Address,
+    pub delegate: Option<Address>,
+    pub title: String,
+    pub start_time: u64,
+    pub end_time: u64,
+    pub creation_time: u64,
+    pub step_duration: u64,
+
+    // bools (smallest)
+    pub is_initialized: bool,
+    pub is_irrevocable: bool,
+    pub is_transferable: bool,
 }
 ```
+
+> **Soroban serialization note:** `#[contracttype]` structs are serialized as an ordered tuple (field order matters). Reordering fields changes the on-ledger schema and requires a migration strategy if any `Vault` entries already exist. Storage serialization has no alignment padding; this change primarily reduces Rust in-memory padding. For upgrade-safe evolution, prefer explicit versioning (e.g., `VaultV1`/`VaultV2`) over reordering existing fields.
 
 > **Note for auditors:** The `VestingContract` does not compute a vested amount internally. It tracks `total_amount` and `released_amount` only. The actual time-based vesting calculation — and any enforcement of `start_time`/`end_time` at claim time — is **not present** in `claim_tokens()`. Any caller can claim any unreleased amount regardless of the current time. This is a significant design note detailed further in [Known Limitations](#known-limitations--auditor-notes).
 
@@ -292,6 +307,7 @@ Lazy vaults have their `USER_VAULTS` index populated on first access via `initia
 
 #### `create_vault_full(owner, amount, start_time, end_time) → u64`
 - Admin-only.
+- Requires `(end_time - start_time) ≤ MAX_DURATION` where `MAX_DURATION = 315,360,000` seconds (10 years). Panics otherwise.
 - Deducts `amount` from `ADMIN_BALANCE`. Panics if insufficient.
 - Writes full vault struct with `is_initialized = true`.
 - Updates `USER_VAULTS[owner]`.
@@ -300,6 +316,7 @@ Lazy vaults have their `USER_VAULTS` index populated on first access via `initia
 
 #### `create_vault_lazy(owner, amount, start_time, end_time) → u64`
 - Admin-only.
+- Requires `(end_time - start_time) ≤ MAX_DURATION` where `MAX_DURATION = 315,360,000` seconds (10 years). Panics otherwise.
 - Same as above but sets `is_initialized = false` and skips `USER_VAULTS` write.
 - Lower storage cost at creation time.
 
@@ -326,6 +343,7 @@ Lazy vaults have their `USER_VAULTS` index populated on first access via `initia
 #### `batch_create_vaults_lazy(batch_data) → Vec<u64>`
 - Admin-only.
 - Validates total batch amount against `ADMIN_BALANCE` in a single check upfront.
+- Requires each vault’s `(end_time - start_time) ≤ MAX_DURATION` where `MAX_DURATION = 315,360,000` seconds (10 years). Panics otherwise.
 - Creates all vaults lazily in a loop. Updates `VAULT_COUNT` once at the end.
 
 #### `batch_create_vaults_full(batch_data) → Vec<u64>`
@@ -350,6 +368,18 @@ Lazy vaults have their `USER_VAULTS` index populated on first access via `initia
 
 #### `check_invariant() → bool`
 - Returns whether `total_locked + total_claimed + admin_balance == initial_supply`.
+
+#### `migrate_liquidity(v2_contract_address) → Map<Address, i128>`
+- Admin-only emergency migration to a V2 architecture.
+- Sets a global `is_deprecated = true` flag and pauses the contract.
+- Transfers all balances of **whitelisted tokens** held by the contract address to `v2_contract_address`.
+- Returns a map of `token_address → migrated_amount`.
+
+#### `is_deprecated() → bool`
+- Pure read — returns whether the contract is deprecated (frozen).
+
+#### `get_migration_target() → Option<Address>`
+- Pure read — returns the V2 contract address if migration has been executed.
 
 ---
 
