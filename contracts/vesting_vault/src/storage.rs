@@ -1,5 +1,5 @@
 use soroban_sdk::{Env, Vec, Address, Map, BytesN};
-use crate::types::{ClaimEvent, AuthorizedPayoutAddress, AddressWhitelistRequest, Nullifier, Commitment, PathPaymentConfig, PathPaymentClaimEvent, LockupConfig, BeneficiaryReassignment, VetoVote, TokenSupplyInfo, LSTConfig, TvlCapConfig, RateLimitConfig, RelayerConfig, ConfidentialGrant, MasterViewingKey, StreamPause};
+use crate::types::{ClaimEvent, AuthorizedPayoutAddress, AddressWhitelistRequest, Nullifier, Commitment, PathPaymentConfig, PathPaymentClaimEvent, LockupConfig, BeneficiaryReassignment, VetoVote, TokenSupplyInfo, LSTConfig, TvlCapConfig, RateLimitConfig, RelayerConfig, ConfidentialGrant, MasterViewingKey, StreamPause, MasterSchedule};
 
 pub const CLAIM_HISTORY: &str = "CLAIM_HISTORY";
 pub const AUTHORIZED_PAYOUT_ADDRESS: &str = "AUTHORIZED_PAYOUT_ADDRESS";
@@ -562,4 +562,46 @@ pub fn add_stream_pause_to_history(e: &Env, pause: &StreamPause) {
     let mut history = get_stream_pause_history(e);
     history.push_back(pause.clone());
     e.storage().instance().set(&STREAM_PAUSE_HISTORY, &history);
+}
+
+// ========== ISSUE #276: Vesting Schedule Consolidation Storage ==========
+
+/// Get master schedule by ID
+pub fn get_master_schedule(e: &Env, master_id: u32) -> Option<MasterSchedule> {
+    e.storage().instance().get(&(crate::types::MASTER_SCHEDULES, master_id))
+}
+
+/// Set master schedule
+pub fn set_master_schedule(e: &Env, master_id: u32, schedule: &MasterSchedule) {
+    e.storage().instance().set(&(crate::types::MASTER_SCHEDULES, master_id), schedule);
+}
+
+/// Remove master schedule
+pub fn remove_master_schedule(e: &Env, master_id: u32) {
+    e.storage().instance().remove(&(crate::types::MASTER_SCHEDULES, master_id));
+}
+
+/// Check if a schedule has been merged
+pub fn is_schedule_merged(e: &Env, schedule_id: u32) -> bool {
+    e.storage()
+        .instance()
+        .get(&(crate::types::MERGED_SCHEDULES, schedule_id))
+        .unwrap_or(false)
+}
+
+/// Mark a schedule as merged
+pub fn mark_schedule_merged(e: &Env, schedule_id: u32) {
+    e.storage().instance().set(&(crate::types::MERGED_SCHEDULES, schedule_id), &true);
+}
+
+/// Get next available master schedule ID
+pub fn get_next_master_schedule_id(e: &Env) -> u32 {
+    let current_id = e
+        .storage()
+        .instance()
+        .get(&("MASTER_SCHEDULE_COUNTER"))
+        .unwrap_or(0u32);
+    let next_id = current_id + 1;
+    e.storage().instance().set(&("MASTER_SCHEDULE_COUNTER"), &next_id);
+    next_id
 }

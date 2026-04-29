@@ -895,3 +895,60 @@ pub struct AllocationLimitExceeded {
     pub max_limit: i128,
     pub rejected_at: u64,
 }
+
+// ========== ISSUE #276: Vesting Schedule Consolidation and Mergers ==========
+
+/// Master schedule created from merging multiple schedules
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct MasterSchedule {
+    /// Unique identifier for the master schedule
+    pub master_id: u32,
+    /// Beneficiary address (all merged schedules must belong to same user)
+    pub beneficiary: Address,
+    /// Asset address (all merged schedules must have same asset)
+    pub asset_address: Address,
+    /// Total amount across all merged schedules
+    pub total_amount: i128,
+    /// Amount already claimed from merged schedules
+    pub claimed_amount: i128,
+    /// Weighted-average start time from all schedules
+    pub start_time: u64,
+    /// Weighted-average end time from all schedules
+    pub end_time: u64,
+    /// Weighted-average cliff duration
+    pub cliff_duration: u64,
+    /// Original schedule IDs that were merged
+    pub merged_schedule_ids: Vec<u32>,
+    /// Timestamp when master schedule was created
+    pub created_at: u64,
+    /// Whether this master schedule is active
+    pub is_active: bool,
+}
+
+/// Event emitted when schedules are successfully consolidated
+#[contractevent]
+#[derive(Clone)]
+pub struct SchedulesConsolidated {
+    /// Beneficiary who initiated the merge
+    #[topic]
+    pub beneficiary: Address,
+    /// Original schedule IDs that were burned
+    #[topic]
+    pub burned_schedule_ids: Vec<u32>,
+    /// New master schedule ID created
+    #[topic]
+    pub master_schedule_id: u32,
+    /// Total consolidated amount
+    pub total_amount: i128,
+    /// Weighted-average end time
+    pub new_end_time: u64,
+    /// Timestamp of consolidation
+    pub timestamp: u64,
+}
+
+/// Storage key for master schedules
+pub const MASTER_SCHEDULES: &str = "MASTER_SCHEDULES";
+
+/// Storage key for tracking merged schedule relationships
+pub const MERGED_SCHEDULES: &str = "MERGED_SCHEDULES";

@@ -122,4 +122,16 @@ pub enum Error {
     OverClaimAttempt = 1001,
     /// #269: Master viewing key not authorized for clawback
     ViewingKeyUnauthorized = 1002,
+
+    // 🔄 Schedule Consolidation (1100s)
+    /// #276: Asset mismatch between schedules - cannot merge
+    AssetMismatch = 1100,
+    /// #276: Schedule IDs must belong to the calling user
+    UnauthorizedScheduleAccess = 1101,
+    /// #276: Cannot merge - would artificially accelerate unlock dates
+    UnlockDateAcceleration = 1102,
+    /// #276: At least 2 schedules required for merging
+    InsufficientSchedules = 1103,
+    /// #276: Schedule already merged or inactive
+    ScheduleNotActive = 1104,
 }
