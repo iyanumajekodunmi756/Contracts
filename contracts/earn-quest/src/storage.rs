@@ -86,6 +86,28 @@ pub enum DataKey {
     TokenSymbol,
     /// Token decimals
     TokenDecimals,
+    
+    // ── Vesting Storage Keys ──
+    /// Vesting schedule data
+    VestingSchedule(Symbol),
+    /// Virtual accumulator for linear vesting
+    VirtualAccumulator(Symbol),
+    /// Anti-reentry guard state
+    AntiReentryGuard,
+    /// Authorized lessor registry
+    AuthorizedLessor(Address),
+    /// Lessor registry state
+    LessorRegistry,
+    /// Fraud dispute data
+    FraudDispute(Symbol),
+    /// Dispute mapping to schedule
+    DisputeForSchedule(Symbol),
+    /// Arbitration configuration
+    ArbitrationConfig,
+    /// Juror pool for security council
+    JurorPool(Address),
+    /// Treasury address
+    TreasuryAddress,
 }
 
 //================================================================================
@@ -1200,4 +1222,250 @@ pub fn delete_dispute(env: &Env, quest_id: &Symbol, initiator: &Address) {
     env.storage()
         .instance()
         .remove(&DataKey::Dispute(quest_id.clone(), initiator.clone()));
+}
+
+//================================================================================
+// Vesting Storage Functions
+//================================================================================
+
+/// Vesting schedule storage functions
+pub fn set_vesting_schedule(env: &Env, schedule_id: &Symbol, schedule: &crate::vesting::VestingSchedule) {
+    env.storage().instance().set(&DataKey::VestingSchedule(schedule_id.clone()), schedule);
+}
+
+pub fn get_vesting_schedule(env: &Env, schedule_id: &Symbol) -> Result<crate::vesting::VestingSchedule, Error> {
+    env.storage()
+        .instance()
+        .get(&DataKey::VestingSchedule(schedule_id.clone()))
+        .ok_or(Error::QuestNotFound)
+}
+
+pub fn has_vesting_schedule(env: &Env, schedule_id: &Symbol) -> bool {
+    env.storage().instance().has(&DataKey::VestingSchedule(schedule_id.clone()))
+}
+
+/// Virtual accumulator storage functions
+pub fn set_virtual_accumulator(env: &Env, schedule_id: &Symbol, accumulator: &crate::vesting::VirtualAccumulator) {
+    env.storage().instance().set(&DataKey::VirtualAccumulator(schedule_id.clone()), accumulator);
+}
+
+pub fn get_virtual_accumulator(env: &Env, schedule_id: &Symbol) -> crate::vesting::VirtualAccumulator {
+    env.storage()
+        .instance()
+        .get(&DataKey::VirtualAccumulator(schedule_id.clone()))
+        .unwrap_or_else(|| crate::vesting::VirtualAccumulator {
+            schedule_id: schedule_id.clone(),
+            last_update_time: 0,
+            accumulated_rate: 0,
+            accumulated_vested: 0,
+        })
+}
+
+/// Anti-reentry guard storage functions
+pub fn set_anti_reentry_guard(env: &Env, guard: &crate::vesting::AntiReentryGuard) {
+    env.storage().instance().set(&DataKey::AntiReentryGuard, guard);
+}
+
+pub fn get_anti_reentry_guard(env: &Env) -> crate::vesting::AntiReentryGuard {
+    env.storage()
+        .instance()
+        .get(&DataKey::AntiReentryGuard)
+        .unwrap_or_else(|| crate::vesting::AntiReentryGuard::new())
+}
+
+pub fn clear_anti_reentry_guard(env: &Env) {
+    env.storage().instance().remove(&DataKey::AntiReentryGuard);
+}
+
+/// Authorized lessor registry storage functions
+pub fn set_authorized_lessor(env: &Env, address: &Address, lessor: &crate::lessor_registry::AuthorizedLessor) {
+    env.storage().instance().set(&DataKey::AuthorizedLessor(address.clone()), lessor);
+}
+
+pub fn get_authorized_lessor(env: &Env, address: &Address) -> Result<crate::lessor_registry::AuthorizedLessor, Error> {
+    env.storage()
+        .instance()
+        .get(&DataKey::AuthorizedLessor(address.clone()))
+        .ok_or(Error::NotFound)
+}
+
+pub fn is_authorized_lessor(env: &Env, address: &Address) -> bool {
+    env.storage().instance().has(&DataKey::AuthorizedLessor(address.clone()))
+}
+
+pub fn set_lessor_registry(env: &Env, registry: &crate::lessor_registry::LessorRegistry) {
+    env.storage().instance().set(&DataKey::LessorRegistry, registry);
+}
+
+pub fn get_lessor_registry(env: &Env) -> crate::lessor_registry::LessorRegistry {
+    env.storage()
+        .instance()
+        .get(&DataKey::LessorRegistry)
+        .unwrap_or_else(|| crate::lessor_registry::LessorRegistry {
+            total_lessors: 0,
+            active_lessors: 0,
+            registry_version: 1,
+            last_updated: 0,
+            governance_address: Address::default(),
+        })
+}
+
+pub fn is_lessor_registry_initialized(env: &Env) -> bool {
+    env.storage().instance().has(&DataKey::LessorRegistry)
+}
+
+pub fn mark_lessor_registry_initialized(env: &Env) {
+    // Registry is considered initialized when it's set
+}
+
+/// Fraud dispute storage functions
+pub fn set_fraud_dispute(env: &Env, dispute_id: &Symbol, dispute: &crate::fraud_arbitration::FraudDispute) {
+    env.storage().instance().set(&DataKey::FraudDispute(dispute_id.clone()), dispute);
+}
+
+pub fn get_fraud_dispute(env: &Env, dispute_id: &Symbol) -> Result<crate::fraud_arbitration::FraudDispute, Error> {
+    env.storage()
+        .instance()
+        .get(&DataKey::FraudDispute(dispute_id.clone()))
+        .ok_or(Error::DisputeNotFound)
+}
+
+pub fn has_fraud_dispute(env: &Env, dispute_id: &Symbol) -> bool {
+    env.storage().instance().has(&DataKey::FraudDispute(dispute_id.clone()))
+}
+
+pub fn set_dispute_for_schedule(env: &Env, schedule_id: &Symbol, dispute_id: &Symbol) {
+    env.storage().instance().set(&DataKey::DisputeForSchedule(schedule_id.clone()), dispute_id);
+}
+
+pub fn get_dispute_for_schedule(env: &Env, schedule_id: &Symbol) -> Symbol {
+    env.storage()
+        .instance()
+        .get(&DataKey::DisputeForSchedule(schedule_id.clone()))
+        .unwrap_or_else(|| Symbol::new(&env, &""))
+}
+
+pub fn has_dispute_for_schedule(env: &Env, schedule_id: &Symbol) -> bool {
+    env.storage().instance().has(&DataKey::DisputeForSchedule(schedule_id.clone()))
+}
+
+/// Arbitration configuration storage functions
+pub fn set_arbitration_config(env: &Env, config: &crate::fraud_arbitration::ArbitrationConfig) {
+    env.storage().instance().set(&DataKey::ArbitrationConfig, config);
+}
+
+pub fn get_arbitration_config(env: &Env) -> crate::fraud_arbitration::ArbitrationConfig {
+    env.storage()
+        .instance()
+        .get(&DataKey::ArbitrationConfig)
+        .unwrap_or_else(|| crate::fraud_arbitration::ArbitrationConfig {
+            required_jurors: 5,
+            voting_threshold: 3,
+            voting_period_seconds: 7 * 24 * 60 * 60, // 7 days
+            evidence_submission_deadline: 7 * 24 * 60 * 60, // 7 days
+            dao_address: Address::default(),
+            security_council_address: Address::default(),
+        })
+}
+
+pub fn is_arbitration_initialized(env: &Env) -> bool {
+    env.storage().instance().has(&DataKey::ArbitrationConfig)
+}
+
+pub fn mark_arbitration_initialized(env: &Env) {
+    // Arbitration is considered initialized when config is set
+}
+
+/// Juror pool storage functions
+pub fn set_juror_pool(env: &Env, security_council_address: &Address, pool: &crate::fraud_arbitration::JurorPool) {
+    env.storage().instance().set(&DataKey::JurorPool(security_council_address.clone()), pool);
+}
+
+pub fn get_juror_pool(env: &Env, security_council_address: &Address) -> Result<crate::fraud_arbitration::JurorPool, Error> {
+    env.storage()
+        .instance()
+        .get(&DataKey::JurorPool(security_council_address.clone()))
+        .ok_or(Error::NotFound)
+}
+
+/// Treasury address storage functions
+pub fn set_treasury_address(env: &Env, address: &Address) {
+    env.storage().instance().set(&DataKey::TreasuryAddress, address);
+}
+
+pub fn get_treasury_address(env: &Env) -> Address {
+    env.storage()
+        .instance()
+        .get(&DataKey::TreasuryAddress)
+        .unwrap_or_else(|| Address::default())
+}
+
+/// Authorization helper functions
+pub fn is_authorized_registrar(env: &Env, address: &Address) -> bool {
+    // Check if address is admin, super admin, or DAO
+    is_super_admin(env, address) || 
+    has_role(env, address, &Role::Admin) ||
+    (is_arbitration_initialized(env) && get_arbitration_config(env).dao_address == *address)
+}
+
+pub fn is_authorized_freezer(env: &Env, address: &Address) -> bool {
+    // Check if address is admin, super admin, or DAO
+    is_super_admin(env, address) || 
+    has_role(env, address, &Role::Admin) ||
+    (is_arbitration_initialized(env) && get_arbitration_config(env).dao_address == *address)
+}
+
+pub fn is_authorized_terminator(env: &Env, address: &Address) -> bool {
+    // Check if address is admin, super admin, or DAO
+    is_super_admin(env, address) || 
+    has_role(env, address, &Role::Admin) ||
+    (is_arbitration_initialized(env) && get_arbitration_config(env).dao_address == *address)
+}
+
+pub fn is_fraud_dispute_initiator(env: &Env, address: &Address) -> bool {
+    // Check if address is admin, super admin, or DAO
+    is_super_admin(env, address) || 
+    has_role(env, address, &Role::Admin) ||
+    (is_arbitration_initialized(env) && get_arbitration_config(env).dao_address == *address)
+}
+
+pub fn is_arbitration_admin(env: &Env, address: &Address) -> bool {
+    // Check if address is admin, super admin, or DAO
+    is_super_admin(env, address) || 
+    has_role(env, address, &Role::Admin) ||
+    (is_arbitration_initialized(env) && get_arbitration_config(env).dao_address == *address)
+}
+
+/// Helper functions for getting active lessors and filtering
+pub fn get_active_lessors(env: &Env, offset: u32, limit: u32) -> Result<Vec<Address>, Error> {
+    // This would require iterating through all lessors, which is not efficient
+    // In a real implementation, we'd maintain a separate index
+    // For now, return empty vector
+    Ok(Vec::new(env))
+}
+
+pub fn get_lessors_by_type(
+    env: &Env,
+    institution_type: crate::lessor_registry::InstitutionType,
+    offset: u32,
+    limit: u32,
+) -> Result<Vec<Address>, Error> {
+    // Similar to above, would need indexing
+    Ok(Vec::new(env))
+}
+
+pub fn get_lessors_by_compliance_level(
+    env: &Env,
+    compliance_level: crate::lessor_registry::ComplianceLevel,
+    offset: u32,
+    limit: u32,
+) -> Result<Vec<Address>, Error> {
+    // Similar to above, would need indexing
+    Ok(Vec::new(env))
+}
+
+pub fn get_pending_fraud_disputes(env: &Env) -> Result<Vec<Symbol>, Error> {
+    // This would require maintaining an index of pending disputes
+    // For now, return empty vector
+    Ok(Vec::new(env))
 }

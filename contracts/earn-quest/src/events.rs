@@ -28,6 +28,29 @@ const TOPIC_ESCROW_REFUNDED: Symbol = symbol_short!("esc_ref");
 const TOPIC_COMMITMENT_SUBMITTED: Symbol = symbol_short!("com_sub");
 const TOPIC_SUBMISSION_REVEALED: Symbol = symbol_short!("sub_rev");
 
+// Vesting Events
+const TOPIC_VESTING_SCHEDULE_CREATED: Symbol = symbol_short!("vest_create");
+const TOPIC_VESTING_TOKENS_CLAIMED: Symbol = symbol_short!("vest_claim");
+const TOPIC_VESTING_SCHEDULE_FROZEN: Symbol = symbol_short!("vest_freeze");
+const TOPIC_VESTING_SCHEDULE_UNFROZEN: Symbol = symbol_short!("vest_unfreeze");
+const TOPIC_VESTING_SCHEDULE_TERMINATED: Symbol = symbol_short!("vest_term");
+
+// Lessor Registry Events
+const TOPIC_AUTHORIZED_LESSOR_REGISTERED: Symbol = symbol_short!("lessor_reg");
+const TOPIC_LESSOR_INFO_UPDATED: Symbol = symbol_short!("lessor_up");
+const TOPIC_LESSOR_DEACTIVATED: Symbol = symbol_short!("lessor_deact");
+const TOPIC_LESSOR_REACTIVATED: Symbol = symbol_short!("lessor_react");
+const TOPIC_LESSOR_REGISTRY_INITIALIZED: Symbol = symbol_short!("lessor_init");
+const TOPIC_REGISTRY_GOVERNANCE_UPDATED: Symbol = symbol_short!("lessor_gov");
+
+// Fraud Arbitration Events
+const TOPIC_FRAUD_DISPUTE_RAISED: Symbol = symbol_short!("fraud_disp");
+const TOPIC_JUROR_ADDED: Symbol = symbol_short!("juror_add");
+const TOPIC_JUROR_REMOVED: Symbol = symbol_short!("juror_rem");
+const TOPIC_JUROR_VOTE_CAST: Symbol = symbol_short!("juror_vote");
+const TOPIC_ARBITRATION_INITIALIZED: Symbol = symbol_short!("arb_init");
+const TOPIC_ARBITRATION_RESOLVED: Symbol = symbol_short!("arb_res");
+
 // ═══════════════════════════════════════════════════════════════
 // Enhanced Event Emission with Indexing for Subgraph/Indexer Integration
 // ═══════════════════════════════════════════════════════════════
@@ -374,5 +397,186 @@ pub fn commitment_submitted(env: &Env, quest_id: Symbol, submitter: Address, has
 pub fn submission_revealed(env: &Env, quest_id: Symbol, submitter: Address, proof_hash: BytesN<32>) {
     let topics = (TOPIC_SUBMISSION_REVEALED, quest_id, submitter);
     let data = (proof_hash,);
+    env.events().publish(topics, data);
+}
+
+//================================================================================
+// Vesting Event Functions
+//================================================================================
+
+/// Emitted when a vesting schedule is created (indexed: schedule_id, beneficiary, asset).
+pub fn vesting_schedule_created(
+    env: &Env,
+    schedule_id: Symbol,
+    beneficiary: Address,
+    asset: Address,
+    total_amount: i128,
+    start_time: u64,
+    end_time: u64,
+) {
+    let topics = (TOPIC_VESTING_SCHEDULE_CREATED, schedule_id, beneficiary.clone(), asset.clone());
+    let data = (total_amount, start_time, end_time);
+    env.events().publish(topics, data);
+}
+
+/// Emitted when vested tokens are claimed (indexed: schedule_id, claimer, asset).
+pub fn vesting_tokens_claimed(
+    env: &Env,
+    schedule_id: Symbol,
+    claimer: Address,
+    asset: Address,
+    amount: i128,
+) {
+    let topics = (TOPIC_VESTING_TOKENS_CLAIMED, schedule_id, claimer.clone(), asset.clone());
+    let data = (amount,);
+    env.events().publish(topics, data);
+}
+
+/// Emitted when a vesting schedule is frozen (indexed: schedule_id, freezer).
+pub fn vesting_schedule_frozen(env: &Env, schedule_id: Symbol, freezer: Address) {
+    let topics = (TOPIC_VESTING_SCHEDULE_FROZEN, schedule_id, freezer.clone());
+    let data = ();
+    env.events().publish(topics, data);
+}
+
+/// Emitted when a vesting schedule is unfrozen (indexed: schedule_id, unfreezer).
+pub fn vesting_schedule_unfrozen(env: &Env, schedule_id: Symbol, unfreezer: Address) {
+    let topics = (TOPIC_VESTING_SCHEDULE_UNFROZEN, schedule_id, unfreezer.clone());
+    let data = ();
+    env.events().publish(topics, data);
+}
+
+/// Emitted when a vesting schedule is terminated (indexed: schedule_id, terminator, reason).
+pub fn vesting_schedule_terminated(
+    env: &Env,
+    schedule_id: Symbol,
+    terminator: Address,
+    reason: soroban_sdk::String,
+    unvested_amount: i128,
+) {
+    let topics = (TOPIC_VESTING_SCHEDULE_TERMINATED, schedule_id, terminator.clone());
+    let data = (reason, unvested_amount);
+    env.events().publish(topics, data);
+}
+
+//================================================================================
+// Lessor Registry Event Functions
+//================================================================================
+
+/// Emitted when an authorized lessor is registered (indexed: lessor_address, registrar).
+pub fn authorized_lessor_registered(
+    env: &Env,
+    lessor_address: Address,
+    name: soroban_sdk::String,
+    registrar: Address,
+) {
+    let topics = (TOPIC_AUTHORIZED_LESSOR_REGISTERED, lessor_address.clone(), registrar.clone());
+    let data = (name,);
+    env.events().publish(topics, data);
+}
+
+/// Emitted when lessor information is updated (indexed: lessor_address, updater).
+pub fn lessor_info_updated(env: &Env, lessor_address: Address, updater: Address) {
+    let topics = (TOPIC_LESSOR_INFO_UPDATED, lessor_address.clone(), updater.clone());
+    let data = ();
+    env.events().publish(topics, data);
+}
+
+/// Emitted when a lessor is deactivated (indexed: lessor_address, deactivator).
+pub fn lessor_deactivated(
+    env: &Env,
+    lessor_address: Address,
+    deactivator: Address,
+    reason: soroban_sdk::String,
+) {
+    let topics = (TOPIC_LESSOR_DEACTIVATED, lessor_address.clone(), deactivator.clone());
+    let data = (reason,);
+    env.events().publish(topics, data);
+}
+
+/// Emitted when a lessor is reactivated (indexed: lessor_address, reactivator).
+pub fn lessor_reactivated(env: &Env, lessor_address: Address, reactivator: Address) {
+    let topics = (TOPIC_LESSOR_REACTIVATED, lessor_address.clone(), reactivator.clone());
+    let data = ();
+    env.events().publish(topics, data);
+}
+
+/// Emitted when lessor registry is initialized (indexed: governance_address).
+pub fn lessor_registry_initialized(env: &Env, governance_address: Address) {
+    let topics = (TOPIC_LESSOR_REGISTRY_INITIALIZED, governance_address.clone());
+    let data = ();
+    env.events().publish(topics, data);
+}
+
+/// Emitted when registry governance is updated (indexed: new_governance, updater).
+pub fn registry_governance_updated(env: &Env, new_governance: Address, updater: Address) {
+    let topics = (TOPIC_REGISTRY_GOVERNANCE_UPDATED, new_governance.clone(), updater.clone());
+    let data = ();
+    env.events().publish(topics, data);
+}
+
+//================================================================================
+// Fraud Arbitration Event Functions
+//================================================================================
+
+/// Emitted when a fraud dispute is raised (indexed: dispute_id, schedule_id, beneficiary, initiator).
+pub fn fraud_dispute_raised(
+    env: &Env,
+    dispute_id: Symbol,
+    schedule_id: Symbol,
+    beneficiary: Address,
+    initiator: Address,
+    evidence_hash: BytesN<32>,
+    jurors: soroban_sdk::Vec<Address>,
+) {
+    let topics = (TOPIC_FRAUD_DISPUTE_RAISED, dispute_id, schedule_id, beneficiary.clone(), initiator.clone());
+    let data = (evidence_hash, jurors);
+    env.events().publish(topics, data);
+}
+
+/// Emitted when a juror is added to security council (indexed: security_council, juror, admin).
+pub fn juror_added(env: &Env, security_council: Address, juror: Address, admin: Address) {
+    let topics = (TOPIC_JUROR_ADDED, security_council.clone(), juror.clone(), admin.clone());
+    let data = ();
+    env.events().publish(topics, data);
+}
+
+/// Emitted when a juror is removed from security council (indexed: security_council, juror, admin).
+pub fn juror_removed(env: &Env, security_council: Address, juror: Address, admin: Address) {
+    let topics = (TOPIC_JUROR_REMOVED, security_council.clone(), juror.clone(), admin.clone());
+    let data = ();
+    env.events().publish(topics, data);
+}
+
+/// Emitted when a juror casts a vote (indexed: dispute_id, juror).
+pub fn juror_vote_cast(
+    env: &Env,
+    dispute_id: Symbol,
+    juror: Address,
+    vote: crate::fraud_arbitration::JurorVote,
+) {
+    let topics = (TOPIC_JUROR_VOTE_CAST, dispute_id, juror.clone());
+    let data = (vote,);
+    env.events().publish(topics, data);
+}
+
+/// Emitted when arbitration system is initialized (indexed: dao_address, security_council_address).
+pub fn arbitration_initialized(env: &Env, dao_address: Address, security_council_address: Address) {
+    let topics = (TOPIC_ARBITRATION_INITIALIZED, dao_address.clone(), security_council_address.clone());
+    let data = ();
+    env.events().publish(topics, data);
+}
+
+/// Emitted when arbitration is resolved (indexed: dispute_id, schedule_id, fraud_confirmed).
+pub fn arbitration_resolved(
+    env: &Env,
+    dispute_id: Symbol,
+    schedule_id: Symbol,
+    fraud_confirmed: bool,
+    unvested_amount: i128,
+    reason: soroban_sdk::String,
+) {
+    let topics = (TOPIC_ARBITRATION_RESOLVED, dispute_id, schedule_id);
+    let data = (fraud_confirmed, unvested_amount, reason);
     env.events().publish(topics, data);
 }

@@ -17,6 +17,11 @@ pub mod token;
 pub mod types;
 pub mod validation;
 
+// New vesting modules
+pub mod vesting;
+pub mod lessor_registry;
+pub mod fraud_arbitration;
+
 #[cfg(test)]
 mod test_token;
 
@@ -959,6 +964,293 @@ impl EarnQuestContract {
     /// A `Vec<Quest>` of active quests.
     pub fn get_active_quests(env: Env, offset: u32, limit: u32) -> Vec<Quest> {
         quest::get_active_quests(&env, offset, limit)
+    }
+
+    //================================================================================
+    // Vesting Functions
+    //================================================================================
+
+    /// Creates a new vesting schedule.
+    pub fn create_vesting_schedule(
+        env: Env,
+        schedule_id: Symbol,
+        beneficiary: Address,
+        asset: Address,
+        total_amount: i128,
+        start_time: u64,
+        end_time: u64,
+        cliff_time: u64,
+        vesting_type: u32, // 0=Linear, 1=Cliff, 2=Custom
+    ) -> Result<(), Error> {
+        security::require_not_paused(&env)?;
+        
+        let vesting_type_enum = match vesting_type {
+            0 => vesting::VestingType::Linear,
+            1 => vesting::VestingType::Cliff,
+            2 => vesting::VestingType::Custom,
+            _ => return Err(Error::InvalidStatusTransition),
+        };
+
+        let schedule = vesting::create_vesting_schedule(
+            &env,
+            schedule_id.clone(),
+            beneficiary.clone(),
+            asset.clone(),
+            total_amount,
+            start_time,
+            end_time,
+            cliff_time,
+            vesting_type_enum,
+        )?;
+
+        storage::set_vesting_schedule(&env, &schedule_id, &schedule);
+
+        events::vesting_schedule_created(
+            &env,
+            schedule_id,
+            beneficiary,
+            asset,
+            total_amount,
+            start_time,
+            end_time,
+        );
+
+        Ok(())
+    }
+
+    /// Claims vested tokens with anti-reentry protection.
+    pub fn claim_vested_tokens(env: Env, schedule_id: Symbol, claimer: Address) -> Result<i128, Error> {
+        security::require_not_paused(&env)?;
+        vesting::claim_vested_tokens(&env, schedule_id, claimer)
+    }
+
+    /// Gets vesting schedule information.
+    pub fn get_vesting_schedule(env: Env, schedule_id: Symbol) -> Result<vesting::VestingSchedule, Error> {
+        storage::get_vesting_schedule(&env, &schedule_id)
+    }
+
+    /// Freezes a vesting schedule (authorized only).
+    pub fn freeze_vesting_schedule(env: Env, schedule_id: Symbol, freezer: Address) -> Result<(), Error> {
+        security::require_not_paused(&env)?;
+        vesting::freeze_vesting_schedule(&env, schedule_id, freezer)
+    }
+
+    /// Unfreezes a vesting schedule (authorized only).
+    pub fn unfreeze_vesting_schedule(env: Env, schedule_id: Symbol, unfreezer: Address) -> Result<(), Error> {
+        security::require_not_paused(&env)?;
+        vesting::unfreeze_vesting_schedule(&env, schedule_id, unfreezer)
+    }
+
+    /// Terminates a vesting schedule and returns unvested tokens to treasury.
+    pub fn terminate_vesting_schedule(
+        env: Env,
+        schedule_id: Symbol,
+        terminator: Address,
+        reason: String,
+    ) -> Result<i128, Error> {
+        security::require_not_paused(&env)?;
+        vesting::terminate_vesting_schedule(&env, schedule_id, terminator, &reason)
+    }
+
+    //================================================================================
+    // Lessor Registry Functions
+    //================================================================================
+
+    /// Initializes the authorized lessor registry.
+    pub fn initialize_lessor_registry(env: Env, governance_address: Address) -> Result<(), Error> {
+        security::require_not_paused(&env)?;
+        lessor_registry::initialize_lessor_registry(&env, governance_address)
+    }
+
+    /// Registers a new authorized lessor.
+    pub fn register_authorized_lessor(
+        env: Env,
+        lessor_address: Address,
+        name: String,
+        institution_type: u32, // 0=Bank, 1=VC, etc.
+        credit_rating: u8,
+        max_vesting_amount: i128,
+        compliance_level: u32, // 0=Basic, 1=Enhanced, etc.
+        registrar: Address,
+    ) -> Result<(), Error> {
+        security::require_not_paused(&env)?;
+        
+        let institution_type_enum = match institution_type {
+            0 => lessor_registry::InstitutionType::Bank,
+            1 => lessor_registry::InstitutionType::VentureCapital,
+            2 => lessor_registry::InstitutionType::HedgeFund,
+            3 => lessor_registry::InstitutionType::Corporate,
+            4 => lessor_registry::InstitutionType::Foundation,
+            5 => lessor_registry::InstitutionType::Government,
+            _ => lessor_registry::InstitutionType::Other,
+        };
+
+        let compliance_level_enum = match compliance_level {
+            0 => lessor_registry::ComplianceLevel::Basic,
+            1 => lessor_registry::ComplianceLevel::Enhanced,
+            2 => lessor_registry::ComplianceLevel::Full,
+            3 => lessor_registry::ComplianceLevel::Sovereign,
+            _ => return Err(Error::InvalidStatusTransition),
+        };
+
+        lessor_registry::register_authorized_lessor(
+            &env,
+            lessor_address,
+            name,
+            institution_type_enum,
+            credit_rating,
+            max_vesting_amount,
+            compliance_level_enum,
+            registrar,
+        )
+    }
+
+    /// Updates lessor information.
+    pub fn update_lessor_info(
+        env: Env,
+        lessor_address: Address,
+        name: Option<String>,
+        credit_rating: Option<u8>,
+        max_vesting_amount: Option<i128>,
+        compliance_level: Option<u32>,
+        updater: Address,
+    ) -> Result<(), Error> {
+        security::require_not_paused(&env)?;
+        
+        let compliance_level_enum = compliance_level.map(|level| match level {
+            0 => lessor_registry::ComplianceLevel::Basic,
+            1 => lessor_registry::ComplianceLevel::Enhanced,
+            2 => lessor_registry::ComplianceLevel::Full,
+            3 => lessor_registry::ComplianceLevel::Sovereign,
+            _ => return Err(Error::InvalidStatusTransition),
+        });
+
+        lessor_registry::update_lessor_info(
+            &env,
+            lessor_address,
+            name,
+            credit_rating,
+            max_vesting_amount,
+            compliance_level_enum,
+            updater,
+        )
+    }
+
+    /// Checks if an address is an authorized lessor.
+    pub fn is_authorized_lessor(env: Env, address: Address) -> bool {
+        lessor_registry::is_authorized_lessor(&env, &address)
+    }
+
+    /// Gets lessor information.
+    pub fn get_lessor_info(env: Env, address: Address) -> Result<lessor_registry::AuthorizedLessor, Error> {
+        lessor_registry::get_lessor_info(&env, &address)
+    }
+
+    //================================================================================
+    // Fraud Arbitration Functions
+    //================================================================================
+
+    /// Initializes the arbitration system.
+    pub fn initialize_arbitration(
+        env: Env,
+        dao_address: Address,
+        security_council_address: Address,
+        required_jurors: u32,
+        voting_threshold: u32,
+        voting_period_days: u64,
+    ) -> Result<(), Error> {
+        security::require_not_paused(&env)?;
+        fraud_arbitration::initialize_arbitration(
+            &env,
+            dao_address,
+            security_council_address,
+            required_jurors,
+            voting_threshold,
+            voting_period_days,
+        )
+    }
+
+    /// Raises a fraud dispute.
+    pub fn raise_fraud_dispute(
+        env: Env,
+        dispute_id: Symbol,
+        target_schedule: Symbol,
+        target_beneficiary: Address,
+        initiator: Address,
+        evidence_hash: BytesN<32>,
+    ) -> Result<fraud_arbitration::FraudDispute, Error> {
+        security::require_not_paused(&env)?;
+        fraud_arbitration::raise_fraud_dispute(
+            &env,
+            dispute_id,
+            target_schedule,
+            target_beneficiary,
+            initiator,
+            evidence_hash,
+        )
+    }
+
+    /// Casts a vote as a juror.
+    pub fn cast_juror_vote(
+        env: Env,
+        dispute_id: Symbol,
+        juror: Address,
+        vote: u32, // 0=SlashForFraud, 1=DismissCharges
+    ) -> Result<(), Error> {
+        security::require_not_paused(&env)?;
+        
+        let vote_enum = match vote {
+            0 => fraud_arbitration::JurorVote::SlashForFraud,
+            1 => fraud_arbitration::JurorVote::DismissCharges,
+            _ => return Err(Error::InvalidStatusTransition),
+        };
+
+        fraud_arbitration::cast_juror_vote(&env, dispute_id, juror, vote_enum)
+    }
+
+    /// Gets fraud dispute information.
+    pub fn get_fraud_dispute(env: Env, dispute_id: Symbol) -> Result<fraud_arbitration::FraudDispute, Error> {
+        fraud_arbitration::get_fraud_dispute(&env, &dispute_id)
+    }
+
+    /// Auto-resolves expired disputes.
+    pub fn auto_resolve_expired_disputes(env: Env) -> Result<u32, Error> {
+        security::require_not_paused(&env)?;
+        fraud_arbitration::auto_resolve_expired_disputes(&env)
+    }
+
+    /// Adds a juror to the security council.
+    pub fn add_juror(
+        env: Env,
+        security_council_address: Address,
+        juror_address: Address,
+        admin: Address,
+    ) -> Result<(), Error> {
+        security::require_not_paused(&env)?;
+        fraud_arbitration::add_juror(&env, security_council_address, juror_address, admin)
+    }
+
+    /// Removes a juror from the security council.
+    pub fn remove_juror(
+        env: Env,
+        security_council_address: Address,
+        juror_address: Address,
+        admin: Address,
+    ) -> Result<(), Error> {
+        security::require_not_paused(&env)?;
+        fraud_arbitration::remove_juror(&env, security_council_address, juror_address, admin)
+    }
+
+    /// Sets the treasury address.
+    pub fn set_treasury_address(env: Env, treasury_address: Address, admin: Address) -> Result<(), Error> {
+        admin::require_role(&env, &admin, Role::SuperAdmin)?;
+        storage::set_treasury_address(&env, &treasury_address);
+        Ok(())
+    }
+
+    /// Gets the treasury address.
+    pub fn get_treasury_address(env: Env) -> Address {
+        storage::get_treasury_address(&env)
     }
 
     /// Returns a list of quests within a specific reward range.

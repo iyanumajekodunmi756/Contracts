@@ -138,6 +138,40 @@ pub enum Error {
     IndexOutOfBounds = 112,
     CommitmentNotFound = 113,
     InvalidCommitment = 114,
+
+    // Vesting Errors
+    VestingScheduleNotFound = 115,
+    VestingScheduleAlreadyExists = 116,
+    InvalidVestingType = 117,
+    VestingScheduleFrozen = 118,
+    VestingScheduleInactive = 119,
+    InsufficientVestedTokens = 120,
+    VestingCalculationError = 121,
+
+    // Lessor Registry Errors
+    LessorNotFound = 122,
+    LessorAlreadyExists = 123,
+    InvalidInstitutionType = 124,
+    InvalidComplianceLevel = 125,
+    InvalidCreditRating = 126,
+    LessorNotActive = 127,
+    ExceedsMaxVestingAmount = 128,
+
+    // Fraud Arbitration Errors
+    FraudDisputeNotFound = 129,
+    FraudDisputeAlreadyExists = 130,
+    NotAuthorizedJuror = 131,
+    VoteAlreadyCast = 132,
+    VotingPeriodExpired = 133,
+    VotingPeriodNotExpired = 134,
+    InvalidVote = 135,
+    InsufficientJurors = 136,
+    ArbitrationNotInitialized = 137,
+    JurorNotFound = 138,
+    SecurityCouncilNotFound = 139,
+    EvidenceHashInvalid = 140,
+    DisputeAlreadyResolved = 141,
+    TargetScheduleNotFound = 142,
 }
 
 
