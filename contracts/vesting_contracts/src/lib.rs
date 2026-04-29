@@ -22,7 +22,7 @@ pub use errors::Error;
 mod factory;
 pub use factory::{ VestingFactory, VestingFactoryClient };
 mod oracle;
-pub use oracle::{ OracleClient, OracleCondition, OracleType, ComparisonOperator, PerformanceCliff };
+pub use oracle::{ OracleClient, OracleCondition, OracleType, ComparisonOperator, PerformanceCliff, PerformanceMultiplier };
 
 pub mod stake;
 pub use stake::{

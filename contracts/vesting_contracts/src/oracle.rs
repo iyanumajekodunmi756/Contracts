@@ -39,6 +39,14 @@ pub struct PerformanceCliff {
 }
 
 #[contracttype]
+#[derive(Clone, Debug)]
+pub struct PerformanceMultiplier {
+    pub condition: OracleCondition,
+    pub multiplier_bps: u32,        // Basis points (e.g., 12000 = 1.2x)
+    pub fallback_multiplier_bps: u32, // Basis points if condition not met (e.g., 10000 = 1.0x)
+}
+
+#[contracttype]
 pub struct OracleQuery {
     pub vault_id: u64,
     pub conditions: Vec<OracleCondition>,
